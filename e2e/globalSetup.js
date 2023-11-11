@@ -1,5 +1,5 @@
 const path = require('path');
-const { spawn } = require('child_process');
+const childProcess = require('child_process');
 const kill = require('tree-kill');
 
 const config = require('../config');
@@ -11,15 +11,18 @@ const __e2e = {
   port,
   baseUrl,
   adminUserCredentials: {
-    email: config.adminEmail,
-    password: config.adminPassword,
+    email: 'admin@localhost',
+    password: 'changeme',
+    role: 'admin',
   },
-  adminToken: null,
+  adminToken: '',
   testUserCredentials: {
-    email: 'test@test.test',
-    password: '123456',
+    email: 'teste2e@test',
+    password: 'password',
+    role: 'waiter',
+    name: 'Test name',
   },
-  testUserToken: null,
+  testUserToken: '',
   childProcessPid: null,
   // in `testObjects` we keep track of objects created during the test run so
   // that we can clean up before exiting.
@@ -27,20 +30,18 @@ const __e2e = {
   // testObjects: [],
 };
 // import('node-fetch')//   .then(({ default: fetch }) =>
-
-// const fetch = (url, opts = {}) =>
-//   fetch(`${baseUrl}${url}`, {
-//     ...opts,
-//     headers: {
-//       'content-type': 'application/json',
-//       ...opts.headers,
-//     },
-//     ...(
-//       opts.body && typeof opts.body !== 'string'
-//         ? { body: JSON.stringify(opts.body) }
-//         : {}
-//     ),
-//   });
+const fetch = (url, opts = {}) => global.fetch(`${baseUrl}${url}`, {
+  ...opts,
+  headers: {
+    'content-type': 'application/json',
+    ...opts.headers,
+  },
+  ...(
+    opts.body && typeof opts.body !== 'string'
+      ? { body: JSON.stringify(opts.body) }
+      : {}
+  ),
+});
 
 const fetchWithAuth = (token) => (url, opts = {}) => fetch(url, {
   ...opts,
@@ -50,105 +51,106 @@ const fetchWithAuth = (token) => (url, opts = {}) => fetch(url, {
   },
 });
 
-// const fetchAsAdmin = (url, opts) => fetchWithAuth(__e2e.adminToken)(url, opts);
-// const fetchAsTestUser = (url, opts) => fetchWithAuth(__e2e.testUserToken)(url, opts);
+const fetchAsAdmin = (url, opts) => fetchWithAuth(__e2e.adminToken)(url, opts);
+const fetchAsTestUser = (url, opts) => fetchWithAuth(__e2e.testUserToken)(url, opts);
 
-// const createTestUser = () => fetchAsAdmin('/users', {
-//   method: 'POST',
-//   body: __e2e.testUserCredentials,
-// })
-//   .then((resp) => {
-//     if (resp.status !== 200) {
-//       throw new Error('Could not create test user');
-//     }
-//     return fetch('/auth', { method: 'POST', body: __e2e.testUserCredentials });
-//   })
-//   .then((resp) => {
-//     if (resp.status !== 200) {
-//       throw new Error('Could not authenticate test user');
-//     }
-//     return resp.json();
-//   })
-//   .then(({ token }) => Object.assign(__e2e, { testUserToken: token }));
+const createTestUser = () => fetchAsAdmin('/users', {
+  method: 'POST',
+  body: __e2e.testUserCredentials,
+})
+  .then((resp) => {
+    if (resp.status !== 201) {
+      throw new Error('Could not create test user');
+    }
+    return fetch('/login', { method: 'POST', body: __e2e.testUserCredentials });
+  })
+  .then((resp) => {
+    if (resp.status !== 200) {
+      throw new Error('Could not authenticate test user');
+    }
+    return resp.json();
+  })
+  .then(({ acessToken }) => {
+  Object.assign(__e2e, { testUserToken: acessToken })
+});
 
-// const checkAdminCredentials = () => fetch('/auth', {
-//   method: 'POST',
-//   body: __e2e.adminUserCredentials,
-// })
-//   .then((resp) => {
-//     if (resp.status !== 200) {
-//       throw new Error('Could not authenticate as admin user');
-//     }
+const checkAdminCredentials = () => fetch('/login', {
+  method: 'POST',
+  body: __e2e.adminUserCredentials,
+})
+  .then((resp) => {
+    if (resp.status !== 200) {
+      throw new Error('Could not authenticate as admin user');
+    }
+    return resp.json();
+  })
+  .then(({ acessToken }) => {
+    Object.assign(__e2e, { adminToken: acessToken })
+});
 
-//     return resp.json();
-//   })
-//   .then(({ token }) => Object.assign(__e2e, { adminToken: token }));
+const waitForServerToBeReady = (retries = 10) => new Promise((resolve, reject) => {
+  if (!retries) {
+    return reject(new Error('Server took to long to start'));
+  }
 
-// const waitForServerToBeReady = (retries = 10) => new Promise((resolve, reject) => {
-//   if (!retries) {
-//     return reject(new Error('Server took to long to start'));
-//   }
+setTimeout(() => {
+  fetch('/')
+    .then((resp) => (
+      (resp.status !== 200)
+        ? reject(new Error(`GET / responded with ${resp.status}`))
+        : resolve()
+    ))
+    .catch(() => waitForServerToBeReady(retries - 1).then(resolve, reject));
+}, 1000);
+});
 
-//   setTimeout(() => {
-//     fetch('/')
-//       .then((resp) => (
-//         (resp.status !== 200)
-//           ? reject(new Error(`GET / responded with ${resp.status}`))
-//           : resolve()
-//       ))
-//       .catch(() => waitForServerToBeReady(retries - 1).then(resolve, reject));
-//   }, 1000);
-// });
+module.exports = () => new Promise((resolve, reject) => {
+if (process.env.REMOTE_URL) {
+  console.info(`Running tests on remote server ${process.env.REMOTE_URL}`);
+  return resolve();
+}
 
-// module.exports = () => new Promise((resolve, reject) => {
-//   if (process.env.REMOTE_URL) {
-//     console.info(`Running tests on remote server ${process.env.REMOTE_URL}`);
-//     return resolve();
-//   }
+console.info('Staring local server...');
+const child = childProcess.spawn('npm.cmd', ['start', process.env.PORT || 8888], {
+  cwd: path.resolve(__dirname, '../'),
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
 
-//   // TODO: Configurar DB de tests
+Object.assign(__e2e, { childProcessPid: child.pid });
 
-//   console.info('Staring local server...');
-//   const child = spawn('npm.cmd', ['start', process.env.PORT || 8888], {
-//     cwd: path.resolve(__dirname, '../'),
-//     stdio: ['ignore', 'pipe', 'pipe'],
-//   });
+child.stdout.on('data', (chunk) => {
+  console.info(`\x1b[34m${chunk.toString()}\x1b[0m`);
+});
 
-//   Object.assign(__e2e, { childProcessPid: child.pid });
+child.stderr.on('data', (chunk) => {
+  const str = chunk.toString();
+  if (/DeprecationWarning/.test(str)) {
+    return;
+  }
+  console.error('child::stderr', str);
+});
 
-//   child.stdout.on('data', (chunk) => {
-//     console.info(`\x1b[34m${chunk.toString()}\x1b[0m`);
-//   });
+  process.on('uncaughtException', (err) => {
+    console.error('UncaughtException!');
+    console.error(err);
+    kill(child.pid, 'SIGKILL', () => process.exit(1));
+  });
 
-//   child.stderr.on('data', (chunk) => {
-//     const str = chunk.toString();
-//     if (/DeprecationWarning/.test(str)) {
-//       return;
-//     }
-//     console.error('child::stderr', str);
-//   });
+  waitForServerToBeReady()
+    .then(checkAdminCredentials)
+    .then(createTestUser)
+    .then(resolve)
+    .catch((err) => {
+      kill(child.pid, 'SIGKILL', () => reject(err));
+    });
+});
 
-//   process.on('uncaughtException', (err) => {
-//     console.error('UncaughtException!');
-//     console.error(err);
-//     kill(child.pid, 'SIGKILL', () => process.exit(1));
-//   });
+// Export globals - ugly... :-(
+global.__e2e = __e2e;
 
-//   waitForServerToBeReady()
-//     .then(checkAdminCredentials)
-//     .then(createTestUser)
-//     .then(resolve)
-//     .catch((err) => {
-//       kill(child.pid, 'SIGKILL', () => reject(err));
-//     });
-// });
-
-// // Export globals - ugly... :-(
-// global.__e2e = __e2e;
-
-// // Export stuff to be used in tests!
+// Export stuff to be used in tests!
 process.baseUrl = baseUrl;
 process.fetch = fetch;
 process.fetchWithAuth = fetchWithAuth;
-// process.fetchAsAdmin = fetchAsAdmin;
-// process.fetchAsTestUser = fetchAsTestUser;
+process.fetchAsAdmin = fetchAsAdmin;
+process.fetchAsTestUser = fetchAsTestUser;

@@ -31,12 +31,18 @@ const getOrderById = async (req, resp) => {
   try {
     const orderId = req.params.id;
     const order = await Orders.findById(orderId);
+
     if (!order) {
-      return resp.status(404).json({ error: 'Order not found' });
+      resp.status(404).json({ error: 'Order not found' });
     }
+
     resp.json(order);
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'Order not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 
@@ -75,7 +81,11 @@ const updateOrder = async (req, resp) => {
 
     resp.json({ updatedOrder });
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'Order not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 
@@ -85,12 +95,16 @@ const deleteOrder = async (req, resp) => {
     const deletedOrder = await Orders.findByIdAndDelete(orderId);
 
     if (!deletedOrder) {
-      return resp.status(404).json({ error: 'Order not found' });
+      resp.status(404).json({ error: 'Order not found' });
     }
 
     resp.status(200).json({ message: 'Successfully deleted' });
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'Order not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 

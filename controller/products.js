@@ -31,12 +31,18 @@ const getProductById = async (req, resp) => {
   try {
     const productId = req.params.id;
     const product = await Products.findById(productId);
+
     if (!product) {
-      return resp.status(404).json({ error: 'Product not found' });
+      resp.status(404).json({ error: 'Product not found' });
     }
+
     resp.json(product);
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'Product not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 
@@ -68,14 +74,17 @@ const updateProduct = async (req, resp) => {
       },
       { new: true },
     );
-
     if (!updatedProduct) {
-      return resp.status(404).json({ error: 'Product not found' });
+      resp.status(404).json({ error: 'Product not found' });
     }
 
     resp.json({ updatedProduct });
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'Product not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 
@@ -85,12 +94,16 @@ const deleteProduct = async (req, resp) => {
     const deletedProduct = await Products.findByIdAndDelete(productId);
 
     if (!deletedProduct) {
-      return resp.status(404).json({ error: 'Product not found' });
+      resp.status(404).json({ error: 'Product not found' });
     }
 
     resp.status(200).json({ message: 'Successfully deleted' });
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'Product not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 

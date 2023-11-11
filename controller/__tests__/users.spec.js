@@ -33,7 +33,7 @@ describe('createUser', () => {
     bcrypt.hash = jest.fn().mockResolvedValue('hashedPassword');
     User.prototype.save = jest.fn().mockResolvedValue({});
     await createUser(req, res);
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toHaveBeenCalledWith(201);
     expect(bcrypt.hash).toHaveBeenCalledWith('password', 10);
     expect(User).toHaveBeenCalledWith({
       email: 'test@example.com',

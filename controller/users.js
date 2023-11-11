@@ -27,7 +27,7 @@ const createUser = async (req, resp) => {
       await newUser.save();
       newUser.password = undefined;
 
-      resp.status(200).json({ newUser });
+      resp.status(201).json({ newUser });
     } else {
       return resp.status(403).json({ error: 'Email already registered' });
     }
@@ -54,13 +54,17 @@ const getUserById = async (req, resp) => {
     const user = await User.findById(userId);
 
     if (!user) {
-      return resp.status(404).json({ error: 'User not found' });
+      resp.status(404).json({ error: 'User not found' });
     }
 
     user.password = undefined;
     resp.json(user);
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'User not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 
@@ -86,14 +90,18 @@ const updateUser = async (req, resp) => {
     );
 
     if (!updatedUser) {
-      return resp.status(404).json({ error: 'User not found' });
+      resp.status(404).json({ error: 'User not found' });
     }
 
     updatedUser.password = undefined;
 
     resp.json({ updatedUser });
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'User not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 
@@ -103,12 +111,16 @@ const deleteUser = async (req, resp) => {
     const deletedUser = await User.findByIdAndDelete(userId);
 
     if (!deletedUser) {
-      return resp.status(404).json({ error: 'User not found' });
+      resp.status(404).json({ error: 'User not found' });
     }
 
     resp.status(200).json({ message: 'Successfully deleted' });
   } catch (error) {
-    resp.status(500).json({ error: 'Internal Server Error' });
+    if (error.reason) {
+      resp.status(404).json({ error: 'User not found' });
+    } else {
+      resp.status(500).json({ error: 'Internal Server Error' });
+    }
   }
 };
 
